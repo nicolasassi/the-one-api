@@ -2,10 +2,17 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"github.com/nicolasassi/the-one-api/domain/entity/book"
 	"github.com/nicolasassi/the-one-api/domain/values"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+)
+
+var (
+	BookNotFound      = errors.New("book with the given ID was not found")
+	NoBookMatchParams = errors.New("no book matches the given params")
 )
 
 type bookDocument struct {
@@ -55,15 +62,51 @@ func NewBookRepository(db *mongo.Database, collectionName string) *bookRepositor
 }
 
 func (bk *bookRepository) Get(ctx context.Context, id string) (book.Book, error) {
-	panic("")
+	primitiveID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return book.Book{}, err
+	}
+	var bookDoc bookDocument
+	if err := bk.collection.FindOne(ctx, bson.M{"_id": primitiveID}).Decode(&bookDoc); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return book.Book{}, BookNotFound
+		}
+		return book.Book{}, err
+	}
+	return *bookDoc.newBookEntity(), nil
+}
+
+func (bk *bookRepository) List(ctx context.Context, params values.QueryParams) ([]book.Book, error) {
+	for k, v := range params {
+		if k == "id" {
+			primitiveID, err := primitive.ObjectIDFromHex(v.(string))
+			if err != nil {
+				return nil, err
+			}
+			delete(params, "id")
+			params["_id"] = primitiveID
+		}
+	}
+	cur, err := bk.collection.Find(ctx, params)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, NoBookMatchParams
+		}
+		return nil, err
+	}
+	var books []book.Book
+	for cur.Next(ctx) {
+		var bookDoc bookDocument
+		if err := cur.Decode(&bookDoc); err != nil {
+			return nil, err
+		}
+		books = append(books, *bookDoc.newBookEntity())
+	}
+	return books, nil
 }
 
 func (bk *bookRepository) Save(ctx context.Context, data *book.Book) (string, error) {
 	panic("")
-}
-
-func (bk *bookRepository) List(ctx context.Context, params values.QueryParams) ([]book.Book, error) {
-	panic("implement me")
 }
 
 func (bk *bookRepository) Update(ctx context.Context, id string, data *book.Book) error {
@@ -71,5 +114,12 @@ func (bk *bookRepository) Update(ctx context.Context, id string, data *book.Book
 }
 
 func (bk *bookRepository) Delete(ctx context.Context, id string) error {
-	panic("implement me")
+	primitiveID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	if err := bk.collection.FindOneAndDelete(ctx, bson.M{"_id": primitiveID}).Err(); err != nil {
+		return err
+	}
+	return nil
 }
