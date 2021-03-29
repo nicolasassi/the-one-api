@@ -106,11 +106,40 @@ func (bk *bookRepository) List(ctx context.Context, params values.QueryParams) (
 }
 
 func (bk *bookRepository) Save(ctx context.Context, data *book.Book) (string, error) {
-	panic("")
+	doc, err := makeBookDocument(data)
+	if err != nil {
+		return "", err
+	}
+	if _, err := bk.List(ctx, map[string]interface{}{
+		"name": doc.Name,
+	}); err != nil && err != NoBookMatchParams {
+		return "", err
+	}
+	result, err := bk.collection.InsertOne(ctx, doc)
+	if err != nil {
+		return "", err
+	}
+	return result.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
 func (bk *bookRepository) Update(ctx context.Context, id string, data *book.Book) error {
-	panic("implement me")
+	doc, err := makeBookDocument(data)
+	if err != nil {
+		return err
+	}
+	if _, err := bk.Get(ctx, id); err != nil {
+		return err
+	}
+	primitiveID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	if err := bk.collection.FindOneAndUpdate(ctx,
+		bson.M{"_id": primitiveID},
+		bson.M{"$set": bson.M{"publish.date": doc.Publish.Date}}).Err(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (bk *bookRepository) Delete(ctx context.Context, id string) error {
