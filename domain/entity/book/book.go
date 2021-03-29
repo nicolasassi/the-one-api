@@ -7,9 +7,9 @@ import (
 )
 
 type Book struct {
-	ID      string         `json:"id"`
-	Name    string         `json:"name"`
-	Publish values.Publish `json:"publish"`
+	ID      string          `json:"id"`
+	Name    string          `json:"name"`
+	Publish *values.Publish `json:"publish"`
 }
 
 func (b Book) Validate(action string) map[string]string {
