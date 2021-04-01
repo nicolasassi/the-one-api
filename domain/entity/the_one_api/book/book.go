@@ -9,5 +9,4 @@ type Book struct {
 
 type Repository interface {
 	Get(ctx context.Context, id string) (Book, error)
-	List(ctx context.Context) ([]Book, error)
 }
