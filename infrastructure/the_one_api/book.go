@@ -66,7 +66,7 @@ func (br bookRepository) Get(ctx context.Context, id string) (book.Book, error) 
 	if err != nil {
 		return book.Book{}, err
 	}
-	if len(respParsed.Docs) > 0 {
+	if len(respParsed.Docs) == 0 {
 		return book.Book{}, BookNotFound
 	}
 	doc, err := json.Marshal(respParsed.Docs[0])
